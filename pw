@@ -1,0 +1,163 @@
+#!/bin/sh
+
+# pw is a simple password manager
+# it saves strings in pgp-encrypted files
+# and copies them to the clipboard
+# depends on gpg and xclip
+
+# CONFIGURATION
+
+gpg_recipient="post@etannert.de"
+
+# CHECK DEPENDENCIES
+
+dep_missing=false
+
+missing () {
+  echo "this script depends on $1. please install it"
+  dep_missing=true
+}
+
+command -v gpg >/dev/null 2>&1 || missing gpg
+command -v xclip >/dev/null 2>&1 || missing xclip
+command -v pwgen >/dev/null 2>&1 || missing pwgen
+
+if $dep_missing; then
+  exit 1
+fi
+
+# FUNCTIONS
+
+pw_write () {
+  echo -n "$1" | gpg -ea -r "$gpg_recipient" > "$2"
+}
+
+pw_clip () {
+  echo -n "$1" | xclip -selection clipboard
+}
+
+pw_new () {
+  password=$(pwgen -s 32)
+  pw_write "$password" "$1"
+  pw_clip "$password"
+}
+
+pw_set () {
+  pw_write "$2" "$1"
+  pw_clip "$2"
+}
+
+pw_get () {
+  password=$(gpg -q -d "$1" | tail -n 1)
+  pw_clip "$password"
+}
+
+print_usage () {
+  echo ""
+  echo "pw is a simple password manager"
+  echo "it stores passwords in gpg encrypted files"
+  echo "and copies them to the clipboard via xclip"
+  echo ""
+  echo "usage: pw [option] file"
+  echo ""
+  echo "options:"
+  echo ""
+  echo "--new|-n            generate a new random password,"
+  echo "                    encrypt it, save it to file and"
+  echo "                    copy it to the clipboard"
+  echo ""
+  echo "--set|-s <password> encrypt the given password,"
+  echo "                    save it to file and copy it"
+  echo "                    to the clipboard"
+  echo ""
+  echo "if no options are specified: read the password"
+  echo "from file, decrypt, copy to the clipboard"
+  echo ""
+  exit 0
+}
+
+# COMMAND LINE PARAMS
+
+file=""
+_command=""
+_new=""
+_set=""
+_password=""
+
+# we can already guess from the number
+# of arguments which action should be taken
+
+if [ $# -eq 0 ]; then
+  print_usage
+elif [ $# -eq 1 ]; then
+  file="$1"
+  _command="get"
+elif [ $# -eq 2 ]; then
+  file="$2"
+  _new="$1"
+  _command="new"
+elif [ $# -eq 3 ]; then
+  file="$3"
+  _password="$2"
+  _set="$1"
+  _command="set"
+else
+  echo "too many arguments"
+  echo "run pw without arguments to see usage info"
+  exit 1
+fi
+
+assert_is_file () {
+  if [ ! -f "$1" ]; then
+    echo "$1 is not a file"
+    exit 1
+  fi
+}
+
+unknown_option () {
+  echo "unknown option: $1"
+  echo "run pw without arguments to see usage info"
+  exit 1
+}
+
+prompt_overwrite () {
+  if [ -f "$1" ]; then
+    echo -n "$1 already exists. would you like to overwrite it? [y/N] "
+    read reply
+    if [ "$reply" != "Y" -a "$reply" != "y" ]; then
+      exit 0
+    fi
+  fi
+}
+
+if [ "$_command" = "get" ]; then
+
+  assert_is_file "$file"
+  pw_get "$file"
+
+elif [ "$_command" = "new" ]; then
+
+  if [ "$_new" = "-s" -o "$_new" = "--set" ]; then
+    echo "no password supplied to set"
+    echo "run pw without arguments to see usage info"
+    exit 1
+  fi
+
+  if [ "$_new" != "-n" -a "$_new" != "--new" ]; then
+    unknown_option "$_new"
+  fi
+  prompt_overwrite "$file"
+  pw_new "$file"
+
+elif [ "$_command" = "set" ]; then
+
+  if [ "$_set" != "-s" -a "$_set" != "--set" ]; then
+    unknown_option "$_set"
+  fi
+  prompt_overwrite "$file"
+  pw_set "$file" "$_password"
+
+fi
+
+exit 0
+
