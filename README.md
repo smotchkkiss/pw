@@ -13,7 +13,7 @@ Put the pw file into $HOME/bin/ or /usr/local/bin/ or something. Change the gpg_
 ```
 usage: pw [option] file
 
-options:"
+options:
 
 --new|-n            generate a new random password,
                     encrypt it, save it to file and
@@ -37,5 +37,5 @@ If I need a password with particular properties or want to save a password I alr
 
 Then when the password is asked, I just fire up a new terminal again, type `pw pas<TAB>/$name_of_webs<TAB>`, type my PGP key’s passphrase, hit enter, close the terminal and paste the password wherever needed.
 
-pw doesn’t sync passwords to the cloud or your smartphone. :(
+pw doesn’t sync passwords to the cloud or your smartphone :(
 
